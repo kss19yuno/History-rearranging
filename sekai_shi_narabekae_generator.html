@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>世界史・年代並べ替え問題製造機</title>
+<style>
+  body{font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;background:#f6f7fb;margin:0;color:#222}
+  .wrap{max-width:900px;margin:0 auto;padding:28px 18px 50px}
+  h1{margin:0 0 8px;font-size:28px}
+  .sub{color:#666;margin-bottom:22px}
+  .panel,.card{background:white;border-radius:16px;padding:18px;box-shadow:0 3px 15px #00000010;margin-bottom:16px}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  label{font-weight:700;font-size:14px}
+  select,button{width:100%;box-sizing:border-box;padding:11px 12px;border-radius:10px;border:1px solid #d8dbe5;font-size:15px;background:white}
+  button{cursor:pointer;font-weight:700;background:#222;color:white;border:none}
+  button.secondary{background:#eef0f5;color:#222}
+  .actions{display:flex;gap:10px;margin-top:14px}
+  .actions button{flex:1}
+  .question-title{font-weight:800;margin-bottom:10px}
+  .items{display:grid;gap:8px}
+  .item{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid #ddd;border-radius:10px;background:#fafafa}
+  .item select{width:70px;padding:7px}
+  .letter{font-weight:900;min-width:25px}
+  .event{flex:1}
+  .answer{display:none;margin-top:10px;padding:12px;border-radius:10px;background:#f0f6ff}
+  .answer.show{display:block}
+  .result{font-weight:800;margin-top:12px}
+  .score{font-size:20px}
+  .tiny{font-size:13px;color:#777}
+  .tag{display:inline-block;background:#eee;padding:3px 8px;border-radius:999px;font-size:12px;margin:2px}
+  @media(max-width:600px){.actions{flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📚 世界史・年代並べ替え問題製造機</h1>
+  <div class="sub">出来事をランダムに組み合わせて、古い順に並べ替える問題を自動生成します。</div>
+
+  <div class="panel">
+    <div class="controls">
+      <div><label>範囲</label><select id="range">
+        <option value="all">全範囲</option>
+        <option value="early">16〜18世紀</option>
+        <option value="pre">19世紀前半</option>
+        <option value="imperialism">帝国主義・19世紀後半</option>
+        <option value="ww1">20世紀初頭〜第一次世界大戦</option>
+      </select></div>
+      <div><label>1問の個数</label><select id="count">
+        <option>3</option><option selected>5</option><option>7</option><option>10</option>
+      </select></div>
+      <div><label>問題数</label><select id="num">
+        <option>1</option><option selected>3</option><option>5</option><option>10</option>
+      </select></div>
+      <div><label>並べ方</label><select id="direction">
+        <option value="asc">古い → 新しい</option>
+        <option value="desc">新しい → 古い</option>
+      </select></div>
+    </div>
+    <div class="actions">
+      <button onclick="generate()">🎲 新しい問題を作る</button>
+      <button class="secondary" onclick="checkAll()">✅ 全問採点</button>
+    </div>
+  </div>
+
+  <div id="questions"></div>
+</div>
+
+<script>
+const events = [
+  {y:1526, t:"ムガル帝国成立", c:"early"},
+  {y:1565, t:"スペインがフィリピン支配を本格化", c:"early"},
+  {y:1600, t:"イギリス東インド会社設立", c:"early"},
+  {y:1602, t:"オランダ東インド会社（VOC）設立", c:"early"},
+  {y:1683, t:"第二次ウィーン包囲失敗", c:"early"},
+  {y:1782, t:"ラタナコーシン朝（チャクリー朝）成立", c:"early"},
+  {y:1799, t:"ナポレオン時代・戦争開始", c:"early"},
+  {y:1812, t:"米英戦争開始", c:"pre"},
+  {y:1815, t:"ナポレオン戦争終結", c:"pre"},
+  {y:1821, t:"ギリシア独立戦争開始", c:"pre"},
+  {y:1826, t:"海峡植民地成立", c:"pre"},
+  {y:1831, t:"エジプト・ムハンマド＝アリーがオスマン帝国と戦争", c:"pre"},
+  {y:1834, t:"ドイツ関税同盟成立", c:"pre"},
+  {y:1838, t:"オスマン帝国、イギリスとの通商条約", c:"pre"},
+  {y:1853, t:"クリミア戦争開始", c:"imperialism"},
+  {y:1857, t:"インド大反乱", c:"imperialism"},
+  {y:1861, t:"アメリカ南北戦争開始", c:"imperialism"},
+  {y:1863, t:"フランス、カンボジアを保護国化", c:"imperialism"},
+  {y:1863, t:"リンカン奴隷解放宣言", c:"imperialism"},
+  {y:1865, t:"アメリカ南北戦争終結", c:"imperialism"},
+  {y:1866, t:"普墺戦争", c:"imperialism"},
+  {y:1867, t:"大政奉還", c:"imperialism"},
+  {y:1868, t:"戊辰戦争", c:"imperialism"},
+  {y:1869, t:"スエズ運河開通", c:"imperialism"},
+  {y:1870, t:"普仏戦争", c:"imperialism"},
+  {y:1871, t:"ドイツ帝国成立", c:"imperialism"},
+  {y:1871, t:"廃藩置県", c:"imperialism"},
+  {y:1875, t:"エジプト、スエズ運河会社株をイギリスに売却", c:"imperialism"},
+  {y:1876, t:"ミドハト憲法", c:"imperialism"},
+  {y:1877, t:"インド帝国成立", c:"imperialism"},
+  {y:1877, t:"露土戦争開始", c:"imperialism"},
+  {y:1878, t:"ミドハト憲法停止", c:"imperialism"},
+  {y:1882, t:"エジプトがイギリス軍に占領される", c:"imperialism"},
+  {y:1883, t:"フランス、ベトナムを保護国化", c:"imperialism"},
+  {y:1884, t:"ベルリン会議開始", c:"imperialism"},
+  {y:1886, t:"ビルマをインド帝国に編入", c:"imperialism"},
+  {y:1887, t:"仏領インドシナ成立", c:"imperialism"},
+  {y:1889, t:"大日本帝国憲法", c:"imperialism"},
+  {y:1898, t:"米西戦争", c:"imperialism"},
+  {y:1901, t:"オーストラリア連邦成立", c:"ww1"},
+  {y:1905, t:"韓国が日本の保護国となる", c:"ww1"},
+  {y:1908, t:"青年トルコ革命", c:"ww1"},
+  {y:1910, t:"韓国併合", c:"ww1"},
+  {y:1914, t:"第一次世界大戦開始", c:"ww1"},
+  {y:1918, t:"第一次世界大戦終結", c:"ww1"},
+  {y:1923, t:"トルコ共和国成立", c:"ww1"}
+];
+
+let current = [];
+
+function pool(){
+  const r=document.getElementById("range").value;
+  if(r==="all") return events;
+  return events.filter(e=>e.c===r);
+}
+function shuffle(a){
+  a=[...a];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+  return a;
+}
+function generate(){
+  const n=+document.getElementById("count").value;
+  const qn=+document.getElementById("num").value;
+  const p=pool();
+  if(p.length<n){alert("この範囲では選択した個数の問題を作れません。");return;}
+  current=[];
+  let used=new Set();
+  for(let q=0;q<qn;q++){
+    let choices;
+    let tries=0;
+    do{
+      choices=shuffle(p).slice(0,n);
+      tries++;
+    }while(tries<30 && choices.every(e=>used.has(e.t)));
+    choices.forEach(e=>used.add(e.t));
+    current.push(choices);
+  }
+  render();
+}
+function render(){
+  const dir=document.getElementById("direction").value;
+  document.getElementById("questions").innerHTML=current.map((q,qi)=>{
+    const shuffled=shuffle(q);
+    return `<div class="card" data-q="${qi}">
+      <div class="question-title">第${qi+1}問　次の出来事を ${dir==="asc"?"古い→新しい":"新しい→古い"} の順に並べ替えなさい。</div>
+      <div class="items">${shuffled.map((e,i)=>`
+        <div class="item">
+          <span class="letter">${String.fromCharCode(65+i)}.</span>
+          <span class="event">${e.t}</span>
+          <select class="rank">${Array.from({length:shuffled.length},(_,k)=>`<option value="${k+1}">${k+1}番目</option>`).join("")}</select>
+        </div>`).join("")}</div>
+      <div class="actions">
+        <button onclick="check(${qi}, this)">この問題を採点</button>
+        <button class="secondary" onclick="showAnswer(${qi}, this)">答えを見る</button>
+      </div>
+      <div class="answer" id="ans${qi}"></div>
+      <div class="result" id="res${qi}"></div>
+    </div>`;
+  }).join("");
+}
+function getRows(qi){
+  const card=document.querySelector(`[data-q="${qi}"]`);
+  return [...card.querySelectorAll(".item")];
+}
+function correctOrder(qi){
+  const dir=document.getElementById("direction").value;
+  return [...current[qi]].sort((a,b)=>dir==="asc"?a.y-b.y:b.y-a.y);
+}
+function check(qi){
+  const rows=getRows(qi);
+  const order=correctOrder(qi);
+  const selected=rows.map(r=>({t:r.querySelector(".event").textContent.trim(), rank:+r.querySelector(".rank").value}))
+                     .sort((a,b)=>a.rank-b.rank);
+  const ok=selected.every((x,i)=>x.t===order[i].t);
+  document.getElementById("res"+qi).innerHTML=ok?`🎉 正解！`:`❌ 不正解。正しい順番を確認してみよう。`;
+}
+function showAnswer(qi){
+  const order=correctOrder(qi);
+  document.getElementById("ans"+qi).innerHTML="<b>正解：</b>"+order.map((e,i)=>`${i+1}. ${e.t}（${e.y}年）`).join("<br>");
+  document.getElementById("ans"+qi).classList.add("show");
+}
+function checkAll(){current.forEach((_,i)=>check(i));}
+generate();
+</script>
+</body>
+</html>
